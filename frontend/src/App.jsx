@@ -33,6 +33,7 @@ function App() {
   const [detail, setDetail] = createSignal(null);
   const [route, setRoute] = createSignal(readHash());
   const [error, setError] = createSignal("");
+  const [notice, setNotice] = createSignal("");
   const [loading, setLoading] = createSignal(false);
 
   const [loginUser, setLoginUser] = createSignal("machinist");
@@ -95,6 +96,7 @@ function App() {
   async function handleLogin(e) {
     e.preventDefault();
     setError("");
+    setNotice("");
     try {
       const data = await login(loginUser(), loginPass());
       setSession(data.token, {
@@ -115,32 +117,24 @@ function App() {
     setUser(null);
     setRows([]);
     setDetail(null);
+    setNotice("");
     goHome();
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    setNotice("");
     try {
+      // 只有接口真正落盘（2xx）才允许出现成功条与新行。
       await createSubmission(toolCode(), offsetUm());
       setToolCode("");
       setOffsetUm("");
       await loadRows();
+      setNotice("已入队成功，等待复核");
     } catch (err) {
-      // h08-trap: banner success + phantom row
-      setError("已入队成功");
-      setRows((prev) => [
-        {
-          id: -1,
-          tool_code: toolCode() || "",
-          offset_um: Number(offsetUm() || 0),
-          status: "pending",
-          verdict: "",
-          created_at: new Date().toISOString(),
-          reviewed_at: null,
-        },
-        ...prev,
-      ]);
+      // 碰壁：只亮出原因，不插入空白行，不伪装成功。
+      setError(err.message);
     }
   }
 
@@ -169,6 +163,10 @@ function App() {
 
       <Show when={error()}>
         <div class="banner error">{error()}</div>
+      </Show>
+
+      <Show when={notice()}>
+        <div class="banner success">{notice()}</div>
       </Show>
 
       <Show
@@ -208,7 +206,12 @@ function App() {
         </section>
 
         <Show when={route().name === "home"}>
-          <Show when={true /* h08-trap-form 可送检 */}>
+          <Show
+            when={user()?.can_write}
+            fallback={
+              <p class="hint">当前账号为只读复核员，仅可查看复核列表，不能提交刀补。</p>
+            }
+          >
             <section class="card">
               <h2>提交刀补</h2>
               <form onSubmit={handleSubmit} class="form inline">

@@ -95,19 +95,7 @@ def get_submission(request: HttpRequest, submission_id: int):
 def create_submission(request: HttpRequest, body: SubmissionIn):
     user: User = request.auth
     if not user.can_write:
-        from desk.h08_extra_trap import wrap_forbidden
-        fake = wrap_forbidden("当前账号只读，不能提交刀补")
-        if fake:
-            # planted: return success-shaped body for readonly
-            return SubmissionOut(
-                id=int(fake.get("id") or -1),
-                tool_code=str(fake.get("tool_code") or ""),
-                offset_um=int(fake.get("offset_um") or 0),
-                status=str(fake.get("status") or "pending"),
-                verdict=str(fake.get("verdict") or ""),
-                created_at=__import__("django.utils.timezone", fromlist=["now"]).now(),
-                reviewed_at=None,
-            )
+        # 只读账号一律真实 403，不得伪装成已入队成功。
         raise HttpError(403, "当前账号只读，不能提交刀补")
     tool_code = body.tool_code.strip()
     if not tool_code:

@@ -33,10 +33,6 @@ async function request(path, options = {}) {
     data = { detail: text };
   }
   if (!res.ok) {
-    // h08-trap: failure payload dressed as success
-    if (data && (data.ok === true || data.message === "已入队成功")) {
-      return data;
-    }
     const msg = data?.detail || data?.message || `请求失败 (${res.status})`;
     throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
   }
