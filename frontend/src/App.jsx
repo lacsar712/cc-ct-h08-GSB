@@ -33,6 +33,7 @@ function App() {
   const [detail, setDetail] = createSignal(null);
   const [route, setRoute] = createSignal(readHash());
   const [error, setError] = createSignal("");
+  const [notice, setNotice] = createSignal("");
   const [loading, setLoading] = createSignal(false);
 
   const [loginUser, setLoginUser] = createSignal("machinist");
@@ -121,26 +122,20 @@ function App() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    setNotice("");
     try {
-      await createSubmission(toolCode(), offsetUm());
+      const created = await createSubmission(toolCode(), offsetUm());
+      // 只有拿到真实落盘编号才算成功；否则按碰壁处理
+      if (!created || typeof created.id !== "number" || created.id <= 0) {
+        throw new Error("提交未被受理，请重试");
+      }
       setToolCode("");
       setOffsetUm("");
+      setNotice(`已入队，编号 #${created.id}`);
       await loadRows();
     } catch (err) {
-      // h08-trap: banner success + phantom row
-      setError("已入队成功");
-      setRows((prev) => [
-        {
-          id: -1,
-          tool_code: toolCode() || "",
-          offset_um: Number(offsetUm() || 0),
-          status: "pending",
-          verdict: "",
-          created_at: new Date().toISOString(),
-          reviewed_at: null,
-        },
-        ...prev,
-      ]);
+      // 碰壁：只亮真实原因，不插空白行、不冒充成功
+      setError(err.message);
     }
   }
 
@@ -169,6 +164,10 @@ function App() {
 
       <Show when={error()}>
         <div class="banner error">{error()}</div>
+      </Show>
+
+      <Show when={notice()}>
+        <div class="banner success">{notice()}</div>
       </Show>
 
       <Show
@@ -208,7 +207,7 @@ function App() {
         </section>
 
         <Show when={route().name === "home"}>
-          <Show when={true /* h08-trap-form 可送检 */}>
+          <Show when={user().can_write}>
             <section class="card">
               <h2>提交刀补</h2>
               <form onSubmit={handleSubmit} class="form inline">
